@@ -1,0 +1,7 @@
+"use client";
+import { FormEvent, useState } from "react";
+export default function LoginPage() {
+  const [message, setMessage] = useState("");
+  function handleSubmit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); setMessage("Formulario preparado. La autenticación puede conectarse a Supabase en la siguiente etapa."); }
+  return <main className="flex min-h-[calc(100vh-73px)] items-center justify-center bg-white px-6 py-12"><div className="w-full max-w-md rounded-2xl border border-slate-200 bg-slate-900 p-8 shadow-xl"><h1 className="text-2xl font-bold text-white">Iniciar sesión</h1><p className="mt-2 text-sm text-slate-400">Accede a tu espacio de DevPort.</p><form onSubmit={handleSubmit} className="mt-6 space-y-4"><label className="block text-sm font-medium text-slate-300">Correo electrónico<input type="email" required className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-blue-500" placeholder="correo@ejemplo.com" /></label><label className="block text-sm font-medium text-slate-300">Contraseña<input type="password" required className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none focus:border-blue-500" placeholder="••••••••" /></label><button type="submit" className="w-full rounded-lg bg-blue-600 py-3 font-semibold text-white hover:bg-blue-500">Login</button></form>{message && <p className="mt-4 rounded-lg bg-blue-500/10 p-3 text-xs text-blue-300">{message}</p>}</div></main>;
+}
