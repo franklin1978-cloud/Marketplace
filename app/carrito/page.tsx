@@ -155,11 +155,12 @@ export default function CarritoPage() {
 
                 </div>
 
-                <button
-                    className="w-full mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-xl"
-                >
-                    Proceder al pago
-                </button>
+                <Link
+                href="/checkout"
+                className="block w-full mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-4 rounded-xl text-center"
+            >
+                Proceder al pago
+                 </Link>
 
             </div>
 
