@@ -1,29 +1,36 @@
 import type { Metadata } from "next";
-
 import "./globals.css";
-
 import Navbar from "./components/Navbar";
-
+import { CartProvider } from "./context/CartContext";
 
 export const metadata: Metadata = {
-  title: "DevPort - Portal de empleos tech",
-  description: "Encuentra empleos y proyectos tech",
+    title: "DevPort - Portal de empleos tech",
+    description: "Encuentra empleos y proyectos tech",
 };
 
 export default function RootLayout({
-  children,
+    children,
 }: Readonly<{
-  children: React.ReactNode;
+    children: React.ReactNode;
 }>) {
-  return (
-    <html
-      lang="es"
->
-      <body className="bg-slate-950 text-white min-h-screen">
-        <Navbar />
-        <main>{children}</main>
-      </body>
-    </html>
 
-  );
+    return (
+        <html lang="es">
+
+            <body className="bg-slate-950 text-white min-h-screen">
+
+                <CartProvider>
+
+                    <Navbar />
+
+                    <main>
+                        {children}
+                    </main>
+
+                </CartProvider>
+
+            </body>
+
+        </html>
+    );
 }

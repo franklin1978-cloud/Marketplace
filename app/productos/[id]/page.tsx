@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useCart } from "../../context/CartContext";
 
 interface Producto {
     id: string;
@@ -20,6 +21,8 @@ export default function ProductoDetalle() {
     const params = useParams();
 
     const id = params.id as string;
+
+    const { agregarAlCarrito } = useCart();
 
     const [producto, setProducto] = useState<Producto | null>(null);
     const [cargando, setCargando] = useState(true);
@@ -180,13 +183,23 @@ export default function ProductoDetalle() {
 
                     </div>
 
-                    <button
-                        disabled={producto.stock === 0}
-                        className="w-full mt-8 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 rounded-xl"
-                    >
-                        🛒 Agregar al carrito
-                    </button>
+             <button
+    type="button"
+    disabled={producto.stock === 0}
+    onClick={() => {
+        console.log("1. BOTÓN PRESIONADO");
+        console.log("2. PRODUCTO:", producto);
 
+        agregarAlCarrito(producto);
+
+        console.log("3. agregarAlCarrito EJECUTADO");
+
+        alert("Producto enviado al carrito");
+    }}
+    className="w-full mt-8 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 rounded-xl"
+>
+    🛒 Agregar al carrito
+</button>
                 </div>
 
             </div>
