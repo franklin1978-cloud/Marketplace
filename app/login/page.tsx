@@ -1,23 +1,66 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "../../lib/supabase/client";
 
 export default function LoginPage() {
+
+    const router = useRouter();
+    const supabase = createClient();
 
     const [correo, setCorreo] = useState("");
     const [password, setPassword] = useState("");
 
-    const manejarLogin = (e: React.FormEvent) => {
+    const [cargando, setCargando] = useState(false);
+    const [error, setError] = useState("");
+
+    const handleLogin = async (
+        e: FormEvent<HTMLFormElement>
+    ) => {
 
         e.preventDefault();
 
-        console.log({
-            correo,
-            password
-        });
+        setError("");
+        setCargando(true);
 
-        alert("Inicio de sesión realizado correctamente");
+        try {
+
+            const { error } =
+                await supabase.auth.signInWithPassword({
+                    email: correo,
+                    password: password
+                });
+
+            if (error) {
+                throw error;
+            }
+
+            // Actualizamos la información de la sesión
+            // y enviamos al usuario al inicio.
+            router.push("/");
+            router.refresh();
+
+        } catch (error) {
+
+            console.error(error);
+
+            if (error instanceof Error) {
+                setError(
+                    "Correo o contraseña incorrectos."
+                );
+            } else {
+                setError(
+                    "No se pudo iniciar sesión."
+                );
+            }
+
+        } finally {
+
+            setCargando(false);
+
+        }
     };
 
     return (
@@ -28,7 +71,7 @@ export default function LoginPage() {
 
                 <div className="bg-slate-800 rounded-2xl shadow-xl p-8">
 
-                    {/* TITULO */}
+                    {/* ENCABEZADO */}
 
                     <div className="text-center">
 
@@ -46,10 +89,20 @@ export default function LoginPage() {
 
                     </div>
 
+                    {/* ERROR */}
+
+                    {error && (
+
+                        <div className="mt-6 bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-4">
+                            {error}
+                        </div>
+
+                    )}
+
                     {/* FORMULARIO */}
 
                     <form
-                        onSubmit={manejarLogin}
+                        onSubmit={handleLogin}
                         className="mt-8 space-y-5"
                     >
 
@@ -67,8 +120,8 @@ export default function LoginPage() {
                                 onChange={(e) =>
                                     setCorreo(e.target.value)
                                 }
-                                placeholder="correo@ejemplo.com"
                                 required
+                                placeholder="correo@ejemplo.com"
                                 className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
                             />
 
@@ -78,25 +131,9 @@ export default function LoginPage() {
 
                         <div>
 
-                            <div className="flex justify-between mb-2">
-
-                                <label className="text-sm font-semibold text-slate-300">
-                                    Contraseña
-                                </label>
-
-                                <button
-                                    type="button"
-                                    className="text-xs text-blue-400 hover:text-blue-300"
-                                    onClick={() =>
-                                        alert(
-                                            "La recuperación de contraseña estará disponible próximamente."
-                                        )
-                                    }
-                                >
-                                    ¿Olvidaste tu contraseña?
-                                </button>
-
-                            </div>
+                            <label className="block text-sm font-semibold text-slate-300 mb-2">
+                                Contraseña
+                            </label>
 
                             <input
                                 type="password"
@@ -104,39 +141,26 @@ export default function LoginPage() {
                                 onChange={(e) =>
                                     setPassword(e.target.value)
                                 }
-                                placeholder="********"
                                 required
+                                placeholder="********"
                                 className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
                             />
 
                         </div>
 
-                        {/* RECORDAR */}
-
-                        <div className="flex items-center gap-2">
-
-                            <input
-                                type="checkbox"
-                                id="recordar"
-                                className="w-4 h-4"
-                            />
-
-                            <label
-                                htmlFor="recordar"
-                                className="text-sm text-slate-400"
-                            >
-                                Recordar sesión
-                            </label>
-
-                        </div>
-
-                        {/* BOTON */}
+                        {/* BOTÓN */}
 
                         <button
                             type="submit"
-                            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl transition-colors"
+                            disabled={cargando}
+                            className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 text-white font-bold py-3 rounded-xl transition-colors"
                         >
-                            Iniciar sesión
+
+                            {cargando
+                                ? "Iniciando sesión..."
+                                : "Iniciar sesión"
+                            }
+
                         </button>
 
                     </form>
@@ -147,7 +171,9 @@ export default function LoginPage() {
 
                         <p className="text-slate-400 text-sm">
 
-                            ¿No tienes una cuenta?{" "}
+                            ¿No tienes una cuenta?
+
+                            {" "}
 
                             <Link
                                 href="/registro"
