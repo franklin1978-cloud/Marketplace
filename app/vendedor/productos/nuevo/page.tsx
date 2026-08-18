@@ -1,12 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "../../../../lib/supabase/client";
+import VendedorGuard from "../../components/VendedorGuard";
 
 export default function NuevoProductoPage() {
-
     const router = useRouter();
     const supabase = createClient();
 
@@ -15,94 +14,191 @@ export default function NuevoProductoPage() {
     const [categoria, setCategoria] = useState("");
     const [precio, setPrecio] = useState("");
     const [stock, setStock] = useState("");
-    const [foto, setFoto] = useState("");
+    const [imagen, setImagen] = useState<File | null>(null);
 
     const [cargando, setCargando] = useState(false);
+    const [mensaje, setMensaje] = useState("");
     const [error, setError] = useState("");
 
-    const crearProducto = async (
-        e: FormEvent<HTMLFormElement>
+    const seleccionarImagen = (
+        event: React.ChangeEvent<HTMLInputElement>
     ) => {
+        const archivo = event.target.files?.[0];
 
-        e.preventDefault();
+        if (!archivo) {
+            return;
+        }
+
+        const tiposPermitidos = [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+        ];
+
+        if (!tiposPermitidos.includes(archivo.type)) {
+            setError(
+                "Solo se permiten imágenes JPG, PNG o WEBP."
+            );
+            setImagen(null);
+            return;
+        }
+
+        if (archivo.size > 5 * 1024 * 1024) {
+            setError(
+                "La imagen no puede superar los 5 MB."
+            );
+            setImagen(null);
+            return;
+        }
 
         setError("");
-        setCargando(true);
+        setImagen(archivo);
+    };
+
+    const publicarProducto = async (
+        event: React.FormEvent
+    ) => {
+        event.preventDefault();
+
+        setError("");
+        setMensaje("");
+
+        if (
+            !nombre ||
+            !descripcion ||
+            !categoria ||
+            !precio ||
+            !stock
+        ) {
+            setError(
+                "Completa todos los campos obligatorios."
+            );
+            return;
+        }
+
+        if (!imagen) {
+            setError(
+                "Selecciona una imagen para el producto."
+            );
+            return;
+        }
 
         try {
+            setCargando(true);
 
-            // Obtener usuario autenticado
             const {
-                data: { user },
-                error: errorUsuario
+                data: {
+                    user
+                },
+                error: usuarioError
             } = await supabase.auth.getUser();
 
-            if (errorUsuario) {
-                throw errorUsuario;
-            }
-
-            if (!user) {
-                router.push("/login");
+            if (usuarioError || !user) {
+                setError(
+                    "Debes iniciar sesión para publicar productos."
+                );
                 return;
             }
 
-            // Comprobar que sea vendedor
+            const extension =
+                imagen.name
+                    .split(".")
+                    .pop()
+                    ?.toLowerCase() || "jpg";
+
+            const nombreArchivo =
+                `${crypto.randomUUID()}.${extension}`;
+
+            const rutaImagen =
+                `${user.id}/${nombreArchivo}`;
+
             const {
-                data: perfil,
-                error: errorPerfil
-            } = await supabase
-                .from("perfiles")
-                .select("rol")
-                .eq("id", user.id)
-                .single();
+                error: uploadError
+            } = await supabase.storage
+                .from("productos")
+                .upload(
+                    rutaImagen,
+                    imagen,
+                    {
+                        cacheControl: "3600",
+                        upsert: false
+                    }
+                );
 
-            if (errorPerfil) {
-                throw errorPerfil;
-            }
-
-            if (perfil?.rol !== "vendedor") {
+            if (uploadError) {
+                console.error(
+                    "Error subiendo imagen:",
+                    uploadError
+                );
 
                 setError(
-                    "Solamente los vendedores pueden publicar productos."
+                    "No se pudo subir la imagen."
                 );
 
                 return;
             }
 
-            // Insertar producto
             const {
-                error: errorProducto
+                data: imagenPublica
+            } = supabase.storage
+                .from("productos")
+                .getPublicUrl(rutaImagen);
+
+            const {
+                error: productoError
             } = await supabase
                 .from("productos")
                 .insert({
                     vendedor_id: user.id,
-                    nombre: nombre,
-                    descripcion: descripcion,
-                    categoria: categoria,
+                    nombre,
+                    descripcion,
+                    categoria,
                     precio: Number(precio),
                     stock: Number(stock),
-                    foto: foto || null
+                    calificacion: 0,
+                    foto: imagenPublica.publicUrl
                 });
 
-            if (errorProducto) {
-                throw errorProducto;
+            if (productoError) {
+                console.error(
+                    "Error creando producto:",
+                    productoError
+                );
+
+                await supabase.storage
+                    .from("productos")
+                    .remove([rutaImagen]);
+
+                setError(
+                    "No se pudo crear el producto."
+                );
+
+                return;
             }
 
-            // Regresar a mis productos
-            router.push("/vendedor/productos");
-            router.refresh();
+            setMensaje(
+                "Producto publicado correctamente."
+            );
+
+            setNombre("");
+            setDescripcion("");
+            setCategoria("");
+            setPrecio("");
+            setStock("");
+            setImagen(null);
+
+            setTimeout(() => {
+                router.push("/vendedor/productos");
+                router.refresh();
+            }, 1000);
 
         } catch (error) {
 
             console.error(error);
 
-            if (error instanceof Error) {
-                setError(error.message);
-            } else {
-                setError(
-                    "No se pudo crear el producto."
-                );
-            }
+            setError(
+                "Ocurrió un error inesperado."
+            );
 
         } finally {
 
@@ -112,46 +208,24 @@ export default function NuevoProductoPage() {
     };
 
     return (
-
+        </VendedorGuard>
         <main className="max-w-4xl mx-auto px-6 py-10">
 
-            <Link
-                href="/dashboard"
-                className="text-blue-400 hover:text-blue-300"
-            >
-                ← Volver al dashboard
-            </Link>
+            <h1 className="text-4xl font-bold text-white">
+                Publicar producto
+            </h1>
 
-            <div className="mt-8">
-
-                <h1 className="text-4xl font-bold text-white">
-                    Publicar producto
-                </h1>
-
-                <p className="text-slate-400 mt-2">
-                    Agrega un nuevo producto al Marketplace.
-                </p>
-
-            </div>
-
-            {error && (
-
-                <div className="mt-6 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl p-4">
-                    {error}
-                </div>
-
-            )}
+            <p className="text-slate-400 mt-2">
+                Agrega un nuevo producto a tu tienda.
+            </p>
 
             <form
-                onSubmit={crearProducto}
-                className="bg-slate-800 rounded-2xl p-8 mt-8 space-y-6"
+                onSubmit={publicarProducto}
+                className="bg-slate-800 rounded-2xl p-6 mt-8 space-y-6"
             >
 
-                {/* NOMBRE */}
-
                 <div>
-
-                    <label className="block text-sm font-semibold text-slate-300 mb-2">
+                    <label className="block text-white font-semibold mb-2">
                         Nombre del producto
                     </label>
 
@@ -161,18 +235,13 @@ export default function NuevoProductoPage() {
                         onChange={(e) =>
                             setNombre(e.target.value)
                         }
-                        required
-                        placeholder="Ej: Laptop Lenovo ThinkPad"
-                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none focus:border-blue-500"
+                        placeholder="Ej: Laptop Lenovo"
                     />
-
                 </div>
 
-                {/* DESCRIPCIÓN */}
-
                 <div>
-
-                    <label className="block text-sm font-semibold text-slate-300 mb-2">
+                    <label className="block text-white font-semibold mb-2">
                         Descripción
                     </label>
 
@@ -181,74 +250,32 @@ export default function NuevoProductoPage() {
                         onChange={(e) =>
                             setDescripcion(e.target.value)
                         }
-                        required
                         rows={5}
-                        placeholder="Describe las características del producto..."
-                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none focus:border-blue-500"
+                        placeholder="Describe el producto..."
                     />
-
                 </div>
 
-                {/* CATEGORÍA */}
-
                 <div>
-
-                    <label className="block text-sm font-semibold text-slate-300 mb-2">
+                    <label className="block text-white font-semibold mb-2">
                         Categoría
                     </label>
 
-                    <select
+                    <input
+                        type="text"
                         value={categoria}
                         onChange={(e) =>
                             setCategoria(e.target.value)
                         }
-                        required
-                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
-                    >
-
-                        <option value="">
-                            Selecciona una categoría
-                        </option>
-
-                        <option value="Tecnología">
-                            Tecnología
-                        </option>
-
-                        <option value="Computadoras">
-                            Computadoras
-                        </option>
-
-                        <option value="Celulares">
-                            Celulares
-                        </option>
-
-                        <option value="Accesorios">
-                            Accesorios
-                        </option>
-
-                        <option value="Hogar">
-                            Hogar
-                        </option>
-
-                        <option value="Ropa">
-                            Ropa
-                        </option>
-
-                        <option value="Otros">
-                            Otros
-                        </option>
-
-                    </select>
-
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none focus:border-blue-500"
+                        placeholder="Ej: Computadoras"
+                    />
                 </div>
-
-                {/* PRECIO Y STOCK */}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                     <div>
-
-                        <label className="block text-sm font-semibold text-slate-300 mb-2">
+                        <label className="block text-white font-semibold mb-2">
                             Precio
                         </label>
 
@@ -260,16 +287,13 @@ export default function NuevoProductoPage() {
                             onChange={(e) =>
                                 setPrecio(e.target.value)
                             }
-                            required
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none focus:border-blue-500"
                             placeholder="0.00"
-                            className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
                         />
-
                     </div>
 
                     <div>
-
-                        <label className="block text-sm font-semibold text-slate-300 mb-2">
+                        <label className="block text-white font-semibold mb-2">
                             Stock
                         </label>
 
@@ -280,67 +304,61 @@ export default function NuevoProductoPage() {
                             onChange={(e) =>
                                 setStock(e.target.value)
                             }
-                            required
+                            className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none focus:border-blue-500"
                             placeholder="0"
-                            className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
                         />
-
                     </div>
 
                 </div>
 
-                {/* FOTO */}
-
                 <div>
-
-                    <label className="block text-sm font-semibold text-slate-300 mb-2">
-                        URL de la imagen
+                    <label className="block text-white font-semibold mb-2">
+                        Imagen del producto
                     </label>
 
                     <input
-                        type="url"
-                        value={foto}
-                        onChange={(e) =>
-                            setFoto(e.target.value)
-                        }
-                        placeholder="https://..."
-                        className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={seleccionarImagen}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white file:mr-4 file:bg-blue-500 file:text-white file:border-0 file:px-4 file:py-2 file:rounded-lg"
                     />
 
                     <p className="text-slate-500 text-sm mt-2">
-                        Por ahora utilizaremos una URL. Más adelante implementaremos almacenamiento de imágenes con Supabase Storage.
+                        JPG, PNG o WEBP. Máximo 5 MB.
                     </p>
 
+                    {imagen && (
+                        <p className="text-green-400 text-sm mt-2">
+                            ✓ {imagen.name}
+                        </p>
+                    )}
                 </div>
 
-                {/* BOTONES */}
+                {error && (
+                    <div className="bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg p-4">
+                        {error}
+                    </div>
+                )}
 
-                <div className="flex gap-4 pt-4">
+                {mensaje && (
+                    <div className="bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg p-4">
+                        {mensaje}
+                    </div>
+                )}
 
-                    <Link
-                        href="/dashboard"
-                        className="flex-1 text-center bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 rounded-xl"
-                    >
-                        Cancelar
-                    </Link>
-
-                    <button
-                        type="submit"
-                        disabled={cargando}
-                        className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 text-white font-bold py-3 rounded-xl"
-                    >
-
-                        {cargando
-                            ? "Publicando..."
-                            : "Publicar producto"
-                        }
-
-                    </button>
-
-                </div>
+                <button
+                    type="submit"
+                    disabled={cargando}
+                    className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-slate-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-colors"
+                >
+                    {cargando
+                        ? "Publicando..."
+                        : "Publicar producto"}
+                </button>
 
             </form>
 
         </main>
+        </VendedorGuard>
     );
 }

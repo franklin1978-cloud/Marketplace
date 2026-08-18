@@ -37,24 +37,17 @@ export default function LoginPage() {
                 throw error;
             }
 
-            // Actualizamos la información de la sesión
-            // y enviamos al usuario al inicio.
-            router.push("/");
+            // Login correcto
+            router.push("/dashboard");
             router.refresh();
 
         } catch (error) {
 
-            console.error(error);
+            console.error("Error de login:", error);
 
-            if (error instanceof Error) {
-                setError(
-                    "Correo o contraseña incorrectos."
-                );
-            } else {
-                setError(
-                    "No se pudo iniciar sesión."
-                );
-            }
+            setError(
+                "Correo o contraseña incorrectos."
+            );
 
         } finally {
 
@@ -121,6 +114,7 @@ export default function LoginPage() {
                                     setCorreo(e.target.value)
                                 }
                                 required
+                                autoComplete="email"
                                 placeholder="correo@ejemplo.com"
                                 className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
                             />
@@ -142,6 +136,7 @@ export default function LoginPage() {
                                     setPassword(e.target.value)
                                 }
                                 required
+                                autoComplete="current-password"
                                 placeholder="********"
                                 className="w-full bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-blue-500"
                             />
@@ -153,7 +148,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={cargando}
-                            className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 text-white font-bold py-3 rounded-xl transition-colors"
+                            className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors"
                         >
 
                             {cargando
