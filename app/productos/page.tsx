@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import ProductCard from "../components/ProductCard";
+import Link from "next/link";
+import { useCart } from "../context/CartContext";
 
 interface Producto {
     id: string;
@@ -11,85 +12,256 @@ interface Producto {
     precio: number;
     stock: number;
     calificacion: number;
-    foto: string;
+    foto: string | null;
+}
+
+interface Favorito {
+    id: string;
+    usuario_id: string;
+    producto_id: string;
+    created_at: string;
 }
 
 export default function ProductosPage() {
 
+    const { agregarAlCarrito } = useCart();
+
     const [productos, setProductos] = useState<Producto[]>([]);
+    const [favoritos, setFavoritos] = useState<string[]>([]);
+
     const [cargando, setCargando] = useState(true);
     const [error, setError] = useState("");
 
-    const [busqueda, setBusqueda] = useState("");
-    const [categoriaSeleccionada, setCategoriaSeleccionada] = useState("Todos");
+    const [procesandoFavorito, setProcesandoFavorito] =
+        useState<string | null>(null);
+
+    /*
+     * ==========================================
+     * CARGAR PRODUCTOS
+     * ==========================================
+     */
 
     useEffect(() => {
 
-        const obtenerProductos = async () => {
+        const cargarProductos = async () => {
 
             try {
 
-                const respuesta = await fetch("/api/productos");
+                setCargando(true);
+                setError("");
+
+                const respuesta = await fetch(
+                    "/api/productos",
+                    {
+                        cache: "no-store"
+                    }
+                );
 
                 if (!respuesta.ok) {
-                    throw new Error("No se pudieron obtener los productos");
+
+                    throw new Error(
+                        "No se pudieron obtener los productos."
+                    );
                 }
 
-                const datos = await respuesta.json();
+                const data = await respuesta.json();
 
-                setProductos(datos);
+                if (!Array.isArray(data)) {
+
+                    throw new Error(
+                        "La respuesta del servidor no es válida."
+                    );
+                }
+
+                setProductos(data);
 
             } catch (error) {
 
-                console.error(error);
-                setError("No se pudieron cargar los productos");
+                console.error(
+                    "Error cargando productos:",
+                    error
+                );
+
+                setError(
+                    "No se pudieron cargar los productos."
+                );
 
             } finally {
 
                 setCargando(false);
 
             }
-
         };
 
-        obtenerProductos();
+        cargarProductos();
 
     }, []);
 
-    const categorias = [
-        "Todos",
-        ...Array.from(
-            new Set(productos.map((producto) => producto.categoria))
-        )
-    ];
+    /*
+     * ==========================================
+     * CARGAR FAVORITOS
+     * ==========================================
+     */
 
-    const productosFiltrados = productos.filter((producto) => {
+    useEffect(() => {
 
-        const coincideBusqueda =
-            producto.nombre
-                .toLowerCase()
-                .includes(busqueda.toLowerCase()) ||
-            producto.descripcion
-                .toLowerCase()
-                .includes(busqueda.toLowerCase());
+        const cargarFavoritos = async () => {
 
-        const coincideCategoria =
-            categoriaSeleccionada === "Todos" ||
-            producto.categoria === categoriaSeleccionada;
+            try {
 
-        return coincideBusqueda && coincideCategoria;
-    });
+                const respuesta = await fetch(
+                    "/api/favoritos",
+                    {
+                        method: "GET",
+                        cache: "no-store"
+                    }
+                );
+
+                if (!respuesta.ok) {
+
+                    console.error(
+                        "No se pudieron cargar los favoritos."
+                    );
+
+                    return;
+                }
+
+                const data = await respuesta.json();
+
+                if (!Array.isArray(data)) {
+
+                    console.error(
+                        "La respuesta de favoritos no es válida."
+                    );
+
+                    return;
+                }
+
+                const idsFavoritos = data
+                    .map(
+                        (favorito: Favorito) =>
+                            favorito.producto_id
+                    )
+                    .filter(Boolean);
+
+                setFavoritos(idsFavoritos);
+
+            } catch (error) {
+
+                console.error(
+                    "Error cargando favoritos:",
+                    error
+                );
+
+            }
+        };
+
+        cargarFavoritos();
+
+    }, []);
+
+    /*
+     * ==========================================
+     * AGREGAR / QUITAR FAVORITO
+     * ==========================================
+     */
+
+    const toggleFavorito = async (
+        productoId: string
+    ) => {
+
+        try {
+
+            setProcesandoFavorito(productoId);
+
+            const esFavorito =
+                favoritos.includes(productoId);
+
+            const respuesta = await fetch(
+                "/api/favoritos",
+                {
+                    method: esFavorito
+                        ? "DELETE"
+                        : "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        producto_id: productoId
+                    })
+                }
+            );
+
+            const data = await respuesta.json();
+
+            if (!respuesta.ok) {
+
+                throw new Error(
+                    data.error ||
+                    "No se pudo actualizar el favorito."
+                );
+            }
+
+            if (esFavorito) {
+
+                setFavoritos(
+                    favoritosActuales =>
+                        favoritosActuales.filter(
+                            id =>
+                                id !== productoId
+                        )
+                );
+
+            } else {
+
+                setFavoritos(
+                    favoritosActuales => [
+                        ...favoritosActuales,
+                        productoId
+                    ]
+                );
+
+            }
+
+        } catch (error) {
+
+            console.error(
+                "Error actualizando favorito:",
+                error
+            );
+
+            alert(
+                error instanceof Error
+                    ? error.message
+                    : "No se pudo actualizar el favorito."
+            );
+
+        } finally {
+
+            setProcesandoFavorito(null);
+
+        }
+    };
+
+    /*
+     * ==========================================
+     * CARGANDO
+     * ==========================================
+     */
 
     if (cargando) {
 
         return (
+
             <main className="max-w-6xl mx-auto px-6 py-10">
 
-                <h1 className="text-3xl font-bold text-white mb-8">
+                <h1 className="text-4xl font-bold text-white">
                     Productos
                 </h1>
 
-                <p className="text-slate-400">
+                <p className="text-slate-400 mt-4">
                     Cargando productos...
                 </p>
 
@@ -97,119 +269,303 @@ export default function ProductosPage() {
         );
     }
 
+    /*
+     * ==========================================
+     * ERROR
+     * ==========================================
+     */
+
     if (error) {
 
         return (
+
             <main className="max-w-6xl mx-auto px-6 py-10">
 
-                <h1 className="text-3xl font-bold text-white mb-8">
-                    Productos
-                </h1>
+                <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6">
 
-                <p className="text-red-400">
-                    {error}
-                </p>
+                    <h1 className="text-2xl font-bold text-red-400">
+                        Error
+                    </h1>
+
+                    <p className="text-slate-400 mt-2">
+                        {error}
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={() =>
+                            window.location.reload()
+                        }
+                        className="mt-5 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-5 py-3 rounded-lg"
+                    >
+                        Intentar nuevamente
+                    </button>
+
+                </div>
 
             </main>
         );
     }
 
+    /*
+     * ==========================================
+     * PÁGINA DE PRODUCTOS
+     * ==========================================
+     */
+
     return (
 
         <main className="max-w-6xl mx-auto px-6 py-10">
 
-            {/* Encabezado */}
+            {/* ENCABEZADO */}
 
-            <div className="mb-8">
+            <div className="mb-10">
 
-                <h1 className="text-4xl font-bold text-white">
-                    Marketplace
+                <Link
+                    href="/dashboard"
+                    className="text-blue-400 hover:text-blue-300"
+                >
+                    ← Dashboard
+                </Link>
+
+                <h1 className="text-4xl font-bold text-white mt-4">
+                    Productos
                 </h1>
 
                 <p className="text-slate-400 mt-2">
-                    Encuentra productos y descubre las opiniones de otros compradores.
+                    Explora todos los productos disponibles en Marketplace.
                 </p>
 
-            </div>
-
-            {/* Buscador */}
-
-            <div className="mb-6">
-
-                <input
-                    type="text"
-                    value={busqueda}
-                    onChange={(e) => setBusqueda(e.target.value)}
-                    placeholder="Buscar por nombre o descripción..."
-                    className="w-full bg-slate-800 text-white rounded-xl px-5 py-3 border border-slate-700 focus:outline-none focus:border-blue-500"
-                />
+                <Link
+                    href="/favoritos"
+                    className="inline-block mt-4 text-red-400 hover:text-red-300 font-semibold"
+                >
+                    ❤️ Mis favoritos
+                </Link>
 
             </div>
 
-            {/* Categorías */}
+            {/* SIN PRODUCTOS */}
 
-            <div className="flex flex-wrap gap-3 mb-8">
+            {productos.length === 0 ? (
 
-                {categorias.map((categoria) => (
+                <div className="bg-slate-800 rounded-2xl p-10 text-center">
 
-                    <button
-                        key={categoria}
-                        onClick={() => setCategoriaSeleccionada(categoria)}
-                        className={
-                            categoriaSeleccionada === categoria
-                                ? "bg-blue-500 text-white px-4 py-2 rounded-lg"
-                                : "bg-slate-800 text-slate-300 px-4 py-2 rounded-lg hover:bg-slate-700"
-                        }
-                    >
-                        {categoria}
-                    </button>
+                    <div className="text-5xl">
+                        📦
+                    </div>
 
-                ))}
+                    <h2 className="text-2xl font-bold text-white mt-4">
+                        No hay productos disponibles
+                    </h2>
 
-            </div>
-
-            {/* Resultado */}
-
-            <p className="text-sm text-slate-400 mb-6">
-
-                {productosFiltrados.length} productos encontrados
-
-            </p>
-
-            {/* Productos */}
-
-            {productosFiltrados.length > 0 ? (
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                    {productosFiltrados.map((producto) => (
-
-                        <ProductCard
-                            key={producto.id}
-                            {...producto}
-                        />
-
-                    ))}
+                    <p className="text-slate-400 mt-2">
+                        Actualmente no existen productos publicados.
+                    </p>
 
                 </div>
 
             ) : (
 
-                <div className="text-center py-16">
+                /* LISTA DE PRODUCTOS */
 
-                    <p className="text-slate-400 text-lg">
-                        No se encontraron productos.
-                    </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
 
-                    <button
-                        onClick={() => {
-                            setBusqueda("");
-                            setCategoriaSeleccionada("Todos");
-                        }}
-                        className="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2 rounded-lg"
-                    >
-                        Limpiar filtros
-                    </button>
+                    {productos.map((producto) => {
+
+                        const esFavorito =
+                            favoritos.includes(
+                                producto.id
+                            );
+
+                        const procesando =
+                            procesandoFavorito ===
+                            producto.id;
+
+                        return (
+
+                            <div
+                                key={producto.id}
+                                className="bg-slate-800 rounded-2xl overflow-hidden shadow-lg hover:shadow-xl transition-shadow"
+                            >
+
+                                {/* IMAGEN */}
+
+                                {producto.foto ? (
+
+                                    <img
+                                        src={producto.foto}
+                                        alt={producto.nombre}
+                                        className="w-full h-56 object-cover"
+                                    />
+
+                                ) : (
+
+                                    <div className="w-full h-56 bg-slate-700 flex items-center justify-center">
+
+                                        <span className="text-6xl">
+                                            📦
+                                        </span>
+
+                                    </div>
+
+                                )}
+
+                                {/* INFORMACIÓN */}
+
+                                <div className="p-5">
+
+                                    <span className="inline-block text-blue-400 text-sm font-semibold">
+                                        {producto.categoria}
+                                    </span>
+
+                                    {/* NOMBRE + FAVORITO */}
+
+                                    <div className="flex items-start justify-between gap-3 mt-2">
+
+                                        <h2 className="text-xl font-bold text-white">
+                                            {producto.nombre}
+                                        </h2>
+
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                toggleFavorito(
+                                                    producto.id
+                                                )
+                                            }
+                                            disabled={
+                                                procesando
+                                            }
+                                            aria-label={
+                                                esFavorito
+                                                    ? "Quitar de favoritos"
+                                                    : "Agregar a favoritos"
+                                            }
+                                            title={
+                                                esFavorito
+                                                    ? "Quitar de favoritos"
+                                                    : "Agregar a favoritos"
+                                            }
+                                            className={`shrink-0 text-3xl leading-none transition-transform hover:scale-110 disabled:opacity-50 ${
+                                                esFavorito
+                                                    ? "text-red-500"
+                                                    : "text-slate-400 hover:text-red-400"
+                                            }`}
+                                        >
+                                            {procesando
+                                                ? "..."
+                                                : esFavorito
+                                                    ? "♥"
+                                                    : "♡"}
+                                        </button>
+
+                                    </div>
+
+                                    {/* DESCRIPCIÓN */}
+
+                                    <p className="text-slate-400 text-sm mt-2 line-clamp-3">
+                                        {producto.descripcion}
+                                    </p>
+
+                                    {/* CALIFICACIÓN */}
+
+                                    <div className="flex items-center gap-2 mt-4">
+
+                                        <span className="text-yellow-400">
+
+                                            {"★".repeat(
+                                                Math.max(
+                                                    0,
+                                                    Math.min(
+                                                        5,
+                                                        Math.round(
+                                                            Number(
+                                                                producto.calificacion
+                                                            ) || 0
+                                                        )
+                                                    )
+                                                )
+                                            )}
+
+                                        </span>
+
+                                        <span className="text-slate-500 text-sm">
+                                            {Number(
+                                                producto.calificacion || 0
+                                            ).toFixed(1)}
+                                            /5
+                                        </span>
+
+                                    </div>
+
+                                    {/* PRECIO Y STOCK */}
+
+                                    <div className="flex justify-between items-center mt-5">
+
+                                        <span className="text-2xl font-bold text-white">
+                                            $
+                                            {Number(
+                                                producto.precio
+                                            ).toFixed(2)}
+                                        </span>
+
+                                        {producto.stock > 0 ? (
+
+                                            <span className="text-green-400 text-sm">
+                                                Stock: {producto.stock}
+                                            </span>
+
+                                        ) : (
+
+                                            <span className="text-red-400 text-sm">
+                                                Agotado
+                                            </span>
+
+                                        )}
+
+                                    </div>
+
+                                    {/* BOTONES */}
+
+                                    <div className="flex flex-col gap-3 mt-5">
+
+                                        <Link
+                                            href={`/productos/${producto.id}`}
+                                            className="w-full text-center bg-slate-700 hover:bg-slate-600 text-white font-semibold py-3 rounded-lg transition-colors"
+                                        >
+                                            Ver detalles
+                                        </Link>
+
+                                        <button
+                                            type="button"
+                                            disabled={
+                                                producto.stock <= 0
+                                            }
+                                            onClick={() => {
+
+                                                agregarAlCarrito(
+                                                    producto
+                                                );
+
+                                                alert(
+                                                    "Producto agregado al carrito."
+                                                );
+
+                                            }}
+                                            className="w-full bg-blue-500 hover:bg-blue-600 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 rounded-lg transition-colors"
+                                        >
+                                            🛒 Agregar al carrito
+                                        </button>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        );
+                    })}
 
                 </div>
 

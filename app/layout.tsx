@@ -4,10 +4,9 @@ import Navbar from "./components/Navbar";
 import { CartProvider } from "./context/CartContext";
 
 export const metadata: Metadata = {
-    title: "DevPort - Portal de empleos tech",
-    description: "Encuentra empleos y proyectos tech",
+    title: "Marketplace",
+    description: "Marketplace de productos",
 };
-
 export default function RootLayout({
     children,
 }: Readonly<{

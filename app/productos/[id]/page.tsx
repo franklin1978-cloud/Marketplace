@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCart } from "../../context/CartContext";
 import { createClient } from "../../../lib/supabase/client";
+import RecommendedProducts from "../../components/RecommendedProducts";
 
 interface Producto {
     id: string;
@@ -14,7 +15,7 @@ interface Producto {
     precio: number;
     stock: number;
     calificacion: number;
-    foto: string;
+    foto: string | null;
 }
 
 interface Opinion {
@@ -25,65 +26,212 @@ interface Opinion {
     created_at: string;
 }
 
-export default function ProductoDetalle() {
+export default function ProductoDetallePage() {
 
     const params = useParams();
-
     const id = params.id as string;
 
     const { agregarAlCarrito } = useCart();
 
     const supabase = createClient();
 
-    const [producto, setProducto] = useState<Producto | null>(null);
-    const [cargando, setCargando] = useState(true);
-    const [error, setError] = useState("");
+    const [producto, setProducto] =
+        useState<Producto | null>(null);
 
-    const [opiniones, setOpiniones] = useState<Opinion[]>([]);
-    const [calificacion, setCalificacion] = useState(5);
-    const [comentario, setComentario] = useState("");
-    const [enviandoOpinion, setEnviandoOpinion] = useState(false);
-    const [mensajeOpinion, setMensajeOpinion] = useState("");
+    const [opiniones, setOpiniones] =
+        useState<Opinion[]>([]);
 
-    // =====================================================
-    // OBTENER PRODUCTO
-    // =====================================================
+    const [calificacion, setCalificacion] =
+        useState(5);
+
+    const [comentario, setComentario] =
+        useState("");
+
+    const [puedeOpinar, setPuedeOpinar] =
+        useState(false);
+
+    const [yaOpino, setYaOpino] =
+        useState(false);
+
+    const [enviandoOpinion, setEnviandoOpinion] =
+        useState(false);
+
+    const [mensajeOpinion, setMensajeOpinion] =
+        useState("");
+
+    const [cargando, setCargando] =
+        useState(true);
+
+    const [error, setError] =
+        useState("");
+
+    /*
+     * ==========================================
+     * CARGAR PRODUCTO Y OPINIONES
+     * ==========================================
+     */
 
     useEffect(() => {
 
-        const obtenerProducto = async () => {
+        const cargarDatos = async () => {
 
             try {
 
-                const respuesta = await fetch("/api/productos");
+                setCargando(true);
+                setError("");
+
+                /*
+                 * OBTENER PRODUCTOS DESDE EL API
+                 */
+
+                const respuesta =
+                    await fetch("/api/productos", {
+                        cache: "no-store"
+                    });
 
                 if (!respuesta.ok) {
-                    throw new Error("Error al obtener productos");
+
+                    throw new Error(
+                        "No se pudieron obtener los productos."
+                    );
                 }
 
                 const productos: Producto[] =
                     await respuesta.json();
 
-                const encontrado = productos.find(
-                    (producto) =>
-                        String(producto.id) === String(id)
-                );
+                const productoEncontrado =
+                    productos.find(
+                        (item) =>
+                            String(item.id) ===
+                            String(id)
+                    );
 
-                if (!encontrado) {
+                if (!productoEncontrado) {
 
-                    setError("Producto no encontrado");
+                    setError(
+                        "Producto no encontrado."
+                    );
 
                     return;
                 }
 
-                setProducto(encontrado);
+                setProducto(productoEncontrado);
+
+                /*
+                 * OBTENER OPINIONES
+                 */
+
+                const {
+                    data: opinionesData,
+                    error: errorOpiniones
+                } = await supabase
+                    .from("opiniones")
+                    .select(`
+                        id,
+                        usuario_id,
+                        calificacion,
+                        comentario,
+                        created_at
+                    `)
+                    .eq("producto_id", id)
+                    .order("created_at", {
+                        ascending: false
+                    });
+
+                if (errorOpiniones) {
+
+                    console.error(
+                        "Error obteniendo opiniones:",
+                        errorOpiniones
+                    );
+
+                } else {
+
+                    setOpiniones(
+                        opinionesData || []
+                    );
+
+                }
+
+                /*
+                 * OBTENER USUARIO
+                 */
+
+                const {
+                    data: {
+                        user
+                    }
+                } = await supabase.auth.getUser();
+
+                if (!user) {
+                    return;
+                }
+
+                /*
+                 * COMPROBAR SI COMPRÓ EL PRODUCTO
+                 */
+
+                const {
+                    data: detallesCompra,
+                    error: errorCompra
+                } = await supabase
+                    .from("detalle_pedidos")
+                    .select(`
+                        id,
+                        pedido_id,
+                        pedidos!inner (
+                            id,
+                            usuario_id
+                        )
+                    `)
+                    .eq("producto_id", id)
+                    .eq(
+                        "pedidos.usuario_id",
+                        user.id
+                    );
+
+                if (errorCompra) {
+
+                    console.error(
+                        "Error verificando compra:",
+                        errorCompra
+                    );
+
+                } else if (
+                    detallesCompra &&
+                    detallesCompra.length > 0
+                ) {
+
+                    setPuedeOpinar(true);
+
+                }
+
+                /*
+                 * COMPROBAR SI YA OPINÓ
+                 */
+
+                const opinionExistente =
+                    (opinionesData || []).find(
+                        (opinion) =>
+                            opinion.usuario_id ===
+                            user.id
+                    );
+
+                if (opinionExistente) {
+
+                    setYaOpino(true);
+
+                }
 
             } catch (error) {
 
-                console.error(error);
+                console.error(
+                    "Error cargando detalle:",
+                    error
+                );
 
                 setError(
-                    "No se pudo cargar el producto"
+                    "No se pudo cargar el producto."
                 );
 
             } finally {
@@ -91,66 +239,23 @@ export default function ProductoDetalle() {
                 setCargando(false);
 
             }
+
         };
 
         if (id) {
-            obtenerProducto();
+            cargarDatos();
         }
-
-    }, [id]);
-
-    // =====================================================
-    // OBTENER OPINIONES
-    // =====================================================
-
-    useEffect(() => {
-
-        const obtenerOpiniones = async () => {
-
-            if (!id) {
-                return;
-            }
-
-            const {
-                data,
-                error
-            } = await supabase
-                .from("opiniones")
-                .select(`
-                    id,
-                    usuario_id,
-                    calificacion,
-                    comentario,
-                    created_at
-                `)
-                .eq("producto_id", id)
-                .order("created_at", {
-                    ascending: false
-                });
-
-            if (error) {
-
-                console.error(
-                    "Error obteniendo opiniones:",
-                    error
-                );
-
-                return;
-            }
-
-            setOpiniones(data || []);
-        };
-
-        obtenerOpiniones();
 
     }, [id, supabase]);
 
-    // =====================================================
-    // PUBLICAR OPINIÓN
-    // =====================================================
+    /*
+     * ==========================================
+     * PUBLICAR OPINIÓN
+     * ==========================================
+     */
 
     const publicarOpinion = async (
-        event: React.FormEvent
+        event: React.FormEvent<HTMLFormElement>
     ) => {
 
         event.preventDefault();
@@ -170,6 +275,10 @@ export default function ProductoDetalle() {
 
             setEnviandoOpinion(true);
 
+            /*
+             * OBTENER USUARIO
+             */
+
             const {
                 data: {
                     user
@@ -185,8 +294,100 @@ export default function ProductoDetalle() {
                 return;
             }
 
+            /*
+             * COMPROBAR COMPRA
+             */
+
             const {
-                error
+                data: detallesCompra,
+                error: errorCompra
+            } = await supabase
+                .from("detalle_pedidos")
+                .select(`
+                    id,
+                    pedido_id,
+                    pedidos!inner (
+                        id,
+                        usuario_id
+                    )
+                `)
+                .eq("producto_id", id)
+                .eq(
+                    "pedidos.usuario_id",
+                    user.id
+                );
+
+            if (errorCompra) {
+
+                console.error(
+                    "Error verificando compra:",
+                    errorCompra
+                );
+
+                setMensajeOpinion(
+                    "No se pudo verificar tu compra."
+                );
+
+                return;
+            }
+
+            if (
+                !detallesCompra ||
+                detallesCompra.length === 0
+            ) {
+
+                setMensajeOpinion(
+                    "Solo puedes opinar sobre productos que hayas comprado."
+                );
+
+                return;
+            }
+
+            /*
+             * COMPROBAR OPINIÓN EXISTENTE
+             */
+
+            const {
+                data: opinionExistente,
+                error: errorOpinion
+            } = await supabase
+                .from("opiniones")
+                .select("id")
+                .eq("producto_id", id)
+                .eq("usuario_id", user.id)
+                .maybeSingle();
+
+            if (errorOpinion) {
+
+                console.error(
+                    "Error verificando opinión:",
+                    errorOpinion
+                );
+
+                setMensajeOpinion(
+                    "No se pudo verificar la opinión."
+                );
+
+                return;
+            }
+
+            if (opinionExistente) {
+
+                setYaOpino(true);
+
+                setMensajeOpinion(
+                    "Ya has publicado una opinión para este producto."
+                );
+
+                return;
+            }
+
+            /*
+             * INSERTAR OPINIÓN
+             */
+
+            const {
+                error: errorInsertar
             } = await supabase
                 .from("opiniones")
                 .insert({
@@ -196,11 +397,11 @@ export default function ProductoDetalle() {
                     comentario: comentario.trim()
                 });
 
-            if (error) {
+            if (errorInsertar) {
 
                 console.error(
                     "Error publicando opinión:",
-                    error
+                    errorInsertar
                 );
 
                 setMensajeOpinion(
@@ -210,17 +411,24 @@ export default function ProductoDetalle() {
                 return;
             }
 
+            /*
+             * LIMPIAR FORMULARIO
+             */
+
             setComentario("");
             setCalificacion(5);
+            setYaOpino(true);
 
             setMensajeOpinion(
                 "Opinión publicada correctamente."
             );
 
-            // Recargar opiniones
+            /*
+             * RECARGAR OPINIONES
+             */
 
             const {
-                data
+                data: opinionesActualizadas
             } = await supabase
                 .from("opiniones")
                 .select(`
@@ -235,11 +443,16 @@ export default function ProductoDetalle() {
                     ascending: false
                 });
 
-            setOpiniones(data || []);
+            setOpiniones(
+                opinionesActualizadas || []
+            );
 
         } catch (error) {
 
-            console.error(error);
+            console.error(
+                "Error publicando opinión:",
+                error
+            );
 
             setMensajeOpinion(
                 "Ocurrió un error inesperado."
@@ -252,13 +465,16 @@ export default function ProductoDetalle() {
         }
     };
 
-    // =====================================================
-    // CARGANDO
-    // =====================================================
+    /*
+     * ==========================================
+     * CARGANDO
+     * ==========================================
+     */
 
     if (cargando) {
 
         return (
+
             <main className="max-w-6xl mx-auto px-6 py-10">
 
                 <p className="text-slate-400">
@@ -269,13 +485,16 @@ export default function ProductoDetalle() {
         );
     }
 
-    // =====================================================
-    // ERROR
-    // =====================================================
+    /*
+     * ==========================================
+     * ERROR
+     * ==========================================
+     */
 
     if (error || !producto) {
 
         return (
+
             <main className="max-w-6xl mx-auto px-6 py-10">
 
                 <h1 className="text-3xl font-bold text-white">
@@ -288,7 +507,7 @@ export default function ProductoDetalle() {
 
                 <Link
                     href="/productos"
-                    className="inline-block mt-6 bg-blue-500 hover:bg-blue-600 text-white px-5 py-2 rounded-lg"
+                    className="inline-block mt-6 bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg"
                 >
                     ← Volver a productos
                 </Link>
@@ -297,9 +516,11 @@ export default function ProductoDetalle() {
         );
     }
 
-    // =====================================================
-    // PÁGINA
-    // =====================================================
+    /*
+     * ==========================================
+     * PÁGINA PRINCIPAL
+     * ==========================================
+     */
 
     return (
 
@@ -320,11 +541,25 @@ export default function ProductoDetalle() {
 
                 <div className="bg-slate-800 rounded-2xl overflow-hidden shadow-lg">
 
-                    <img
-                        src={producto.foto}
-                        alt={producto.nombre}
-                        className="w-full h-[450px] object-cover"
-                    />
+                    {producto.foto ? (
+
+                        <img
+                            src={producto.foto}
+                            alt={producto.nombre}
+                            className="w-full h-[450px] object-cover"
+                        />
+
+                    ) : (
+
+                        <div className="w-full h-[450px] bg-slate-700 flex items-center justify-center">
+
+                            <span className="text-7xl">
+                                📦
+                            </span>
+
+                        </div>
+
+                    )}
 
                 </div>
 
@@ -345,15 +580,28 @@ export default function ProductoDetalle() {
                     <div className="flex items-center mt-4">
 
                         <span className="text-yellow-400 text-xl">
+
                             {"★".repeat(
-                                Math.round(
-                                    producto.calificacion
+                                Math.max(
+                                    0,
+                                    Math.min(
+                                        5,
+                                        Math.round(
+                                            Number(
+                                                producto.calificacion
+                                            ) || 0
+                                        )
+                                    )
                                 )
                             )}
+
                         </span>
 
                         <span className="text-slate-400 ml-3">
-                            {producto.calificacion} / 5
+                            {Number(
+                                producto.calificacion || 0
+                            ).toFixed(1)}
+                            / 5
                         </span>
 
                     </div>
@@ -369,7 +617,10 @@ export default function ProductoDetalle() {
                     <div className="mt-8">
 
                         <span className="text-4xl font-bold text-white">
-                            ${producto.precio.toFixed(2)}
+                            $
+                            {Number(
+                                producto.precio
+                            ).toFixed(2)}
                         </span>
 
                     </div>
@@ -394,22 +645,19 @@ export default function ProductoDetalle() {
 
                     </div>
 
-                    {/* CARRITO */}
+                    {/* AGREGAR AL CARRITO */}
 
                     <button
                         type="button"
-                        disabled={producto.stock === 0}
+                        disabled={producto.stock <= 0}
                         onClick={() => {
 
-                            console.log(
-                                "PRODUCTO AGREGADO:",
+                            agregarAlCarrito(
                                 producto
                             );
 
-                            agregarAlCarrito(producto);
-
                             alert(
-                                "Producto enviado al carrito"
+                                "Producto agregado al carrito."
                             );
 
                         }}
@@ -434,106 +682,132 @@ export default function ProductoDetalle() {
 
                 <div className="mt-6">
 
-                    <h3 className="text-lg font-semibold text-white">
-                        Publicar una opinión
-                    </h3>
+                    {puedeOpinar && !yaOpino ? (
 
-                    <form
-                        onSubmit={publicarOpinion}
-                        className="mt-4 space-y-4"
-                    >
+                        <>
 
-                        {/* CALIFICACIÓN */}
+                            <h3 className="text-lg font-semibold text-white">
+                                Publicar una opinión
+                            </h3>
 
-                        <div>
-
-                            <label className="block text-slate-300 mb-2">
-                                Calificación
-                            </label>
-
-                            <select
-                                value={calificacion}
-                                onChange={(e) =>
-                                    setCalificacion(
-                                        Number(
-                                            e.target.value
-                                        )
-                                    )
+                            <form
+                                onSubmit={
+                                    publicarOpinion
                                 }
-                                className="bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3"
+                                className="mt-4 space-y-4"
                             >
 
-                                <option value={5}>
-                                    ⭐⭐⭐⭐⭐
-                                </option>
+                                <div>
 
-                                <option value={4}>
-                                    ⭐⭐⭐⭐
-                                </option>
+                                    <label className="block text-slate-300 mb-2">
+                                        Calificación
+                                    </label>
 
-                                <option value={3}>
-                                    ⭐⭐⭐
-                                </option>
+                                    <select
+                                        value={
+                                            calificacion
+                                        }
+                                        onChange={(e) =>
+                                            setCalificacion(
+                                                Number(
+                                                    e.target.value
+                                                )
+                                            )
+                                        }
+                                        className="bg-slate-900 border border-slate-700 text-white rounded-lg px-4 py-3"
+                                    >
 
-                                <option value={2}>
-                                    ⭐⭐
-                                </option>
+                                        <option value={5}>
+                                            ⭐⭐⭐⭐⭐
+                                        </option>
 
-                                <option value={1}>
-                                    ⭐
-                                </option>
+                                        <option value={4}>
+                                            ⭐⭐⭐⭐
+                                        </option>
 
-                            </select>
+                                        <option value={3}>
+                                            ⭐⭐⭐
+                                        </option>
 
-                        </div>
+                                        <option value={2}>
+                                            ⭐⭐
+                                        </option>
 
-                        {/* COMENTARIO */}
+                                        <option value={1}>
+                                            ⭐
+                                        </option>
 
-                        <div>
+                                    </select>
 
-                            <label className="block text-slate-300 mb-2">
-                                Comentario
-                            </label>
+                                </div>
 
-                            <textarea
-                                value={comentario}
-                                onChange={(e) =>
-                                    setComentario(
-                                        e.target.value
-                                    )
-                                }
-                                rows={4}
-                                placeholder="¿Qué opinas de este producto?"
-                                className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none focus:border-blue-500"
-                            />
+                                <div>
 
-                        </div>
+                                    <label className="block text-slate-300 mb-2">
+                                        Comentario
+                                    </label>
 
-                        {/* MENSAJE */}
+                                    <textarea
+                                        value={
+                                            comentario
+                                        }
+                                        onChange={(e) =>
+                                            setComentario(
+                                                e.target.value
+                                            )
+                                        }
+                                        rows={4}
+                                        placeholder="¿Qué opinas de este producto?"
+                                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none focus:border-blue-500"
+                                    />
 
-                        {mensajeOpinion && (
+                                </div>
 
-                            <p className="text-blue-400">
-                                {mensajeOpinion}
+                                {mensajeOpinion && (
+
+                                    <p className="text-blue-400">
+                                        {mensajeOpinion}
+                                    </p>
+
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={
+                                        enviandoOpinion
+                                    }
+                                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-slate-600 text-white font-semibold px-6 py-3 rounded-lg"
+                                >
+                                    {enviandoOpinion
+                                        ? "Publicando..."
+                                        : "Publicar opinión"}
+                                </button>
+
+                            </form>
+
+                        </>
+
+                    ) : yaOpino ? (
+
+                        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+
+                            <p className="text-green-400 font-semibold">
+                                ✓ Ya has publicado una opinión sobre este producto.
                             </p>
 
-                        )}
+                        </div>
 
-                        {/* BOTÓN */}
+                    ) : (
 
-                        <button
-                            type="submit"
-                            disabled={enviandoOpinion}
-                            className="bg-blue-500 hover:bg-blue-600 disabled:bg-slate-600 text-white font-semibold px-6 py-3 rounded-lg"
-                        >
+                        <div className="bg-slate-900 rounded-xl p-5">
 
-                            {enviandoOpinion
-                                ? "Publicando..."
-                                : "Publicar opinión"}
+                            <p className="text-slate-400">
+                                Solo los compradores de este producto pueden publicar una opinión.
+                            </p>
 
-                        </button>
+                        </div>
 
-                    </form>
+                    )}
 
                 </div>
 
@@ -561,7 +835,15 @@ export default function ProductoDetalle() {
                                     <div className="text-yellow-400 text-lg">
 
                                         {"★".repeat(
-                                            opinion.calificacion
+                                            Math.max(
+                                                0,
+                                                Math.min(
+                                                    5,
+                                                    Number(
+                                                        opinion.calificacion
+                                                    )
+                                                )
+                                            )
                                         )}
 
                                     </div>
@@ -570,9 +852,9 @@ export default function ProductoDetalle() {
 
                                         {new Date(
                                             opinion.created_at
-                                        )
-                                            .toISOString()
-                                            .slice(0, 10)}
+                                        ).toLocaleDateString(
+                                            "es-EC"
+                                        )}
 
                                     </span>
 
@@ -590,7 +872,11 @@ export default function ProductoDetalle() {
 
                 </div>
 
-            </section>
+                        </section>
+
+            <RecommendedProducts
+                productoId={producto.id}
+            />
 
         </main>
     );

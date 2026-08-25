@@ -26,19 +26,26 @@ export default function PedidosPage() {
             try {
 
                 const {
-                    data: { user }
+                    data: { user },
+                    error: errorUsuario
                 } = await supabase.auth.getUser();
 
+                if (errorUsuario) {
+                    throw errorUsuario;
+                }
+
                 if (!user) {
+
                     setError(
                         "Debes iniciar sesión para ver tus pedidos."
                     );
+
                     return;
                 }
 
                 const {
                     data,
-                    error
+                    error: errorPedidos
                 } = await supabase
                     .from("pedidos")
                     .select("*")
@@ -47,8 +54,8 @@ export default function PedidosPage() {
                         ascending: false
                     });
 
-                if (error) {
-                    throw error;
+                if (errorPedidos) {
+                    throw errorPedidos;
                 }
 
                 setPedidos(data || []);
@@ -73,7 +80,7 @@ export default function PedidosPage() {
 
         cargarPedidos();
 
-    }, []);
+    }, [supabase]);
 
     if (cargando) {
 
@@ -200,6 +207,17 @@ export default function PedidosPage() {
                                 <p className="text-2xl font-bold text-white mt-1">
                                     ${Number(pedido.total).toFixed(2)}
                                 </p>
+
+                            </div>
+
+                            <div className="flex items-end">
+
+                                <Link
+                                    href={`/pedidos/${pedido.id}`}
+                                    className="bg-blue-500 hover:bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg"
+                                >
+                                    Ver detalle
+                                </Link>
 
                             </div>
 

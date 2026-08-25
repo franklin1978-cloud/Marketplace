@@ -16,7 +16,7 @@ interface Producto {
     precio: number;
     stock: number;
     calificacion: number;
-    foto: string;
+    foto: string | null;
 }
 
 interface ProductoCarrito extends Producto {

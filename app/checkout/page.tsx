@@ -222,12 +222,17 @@ export default function CheckoutPage() {
                             className="flex items-center gap-4 border-b border-slate-700 pb-5"
                         >
 
-                            <img
-                                src={producto.foto}
-                                alt={producto.nombre}
-                                className="w-20 h-20 object-cover rounded-xl"
-                            />
-
+                            {producto.foto ? (
+    <img
+        src={producto.foto}
+        alt={producto.nombre}
+        className="w-20 h-20 object-cover rounded-xl"
+    />
+) : (
+    <div className="w-20 h-20 bg-slate-700 flex items-center justify-center rounded-xl">
+        <span className="text-2xl">📦</span>
+    </div>
+)}
                             <div className="flex-1">
 
                                 <h3 className="text-white font-semibold">

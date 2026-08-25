@@ -417,7 +417,10 @@ export default function DashboardPage() {
 
                         {/* VENTAS */}
 
-                        <div className="bg-slate-800 rounded-2xl p-6">
+                        <Link
+                            href="/vendedor/ventas"
+                            className="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 transition-colors"
+                        >
 
                             <div className="text-4xl">
                                 💰
@@ -428,14 +431,17 @@ export default function DashboardPage() {
                             </h3>
 
                             <p className="text-slate-400 mt-2">
-                                Próximamente podrás consultar tus ventas.
+                                Consulta los productos vendidos y los pedidos recibidos.
                             </p>
 
-                        </div>
+                        </Link>
 
                         {/* INVENTARIO */}
 
-                        <div className="bg-slate-800 rounded-2xl p-6">
+                        <Link
+                            href="/vendedor/inventario"
+                            className="bg-slate-800 hover:bg-slate-700 rounded-2xl p-6 transition-colors"
+                        >
 
                             <div className="text-4xl">
                                 📊
@@ -446,10 +452,10 @@ export default function DashboardPage() {
                             </h3>
 
                             <p className="text-slate-400 mt-2">
-                                Próximamente podrás administrar tu inventario.
+                                Administra el stock y controla la disponibilidad de tus productos.
                             </p>
 
-                        </div>
+                        </Link>
 
                     </div>
 

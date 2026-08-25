@@ -70,11 +70,17 @@ export default function CarritoPage() {
                         className="bg-slate-800 rounded-2xl p-5 flex flex-col md:flex-row gap-5 items-center"
                     >
 
-                        <img
-                            src={producto.foto}
-                            alt={producto.nombre}
-                            className="w-32 h-32 object-cover rounded-xl"
-                        />
+                        {producto.foto ? (
+    <img
+        src={producto.foto}
+        alt={producto.nombre}
+        className="w-32 h-32 object-cover rounded-xl"
+    />
+) : (
+    <div className="w-32 h-32 bg-slate-700 flex items-center justify-center rounded-xl">
+        <span className="text-4xl">📦</span>
+    </div>
+)}
 
                         <div className="flex-1">
 
