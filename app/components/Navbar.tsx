@@ -128,7 +128,7 @@ export default function Navbar() {
                     href="/"
                     className="text-xl font-bold text-white hover:text-blue-400 transition-colors"
                 >
-                    DevPort
+                    E-Commerce
                 </Link>
 
                 {/* NAVEGACIÓN */}
