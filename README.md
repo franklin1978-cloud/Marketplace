@@ -6,6 +6,10 @@ Plataforma web de comercio electrónico que permite a compradores explorar produ
 
 🔗 **Repositorio:** https://github.com/franklin1978-cloud/Marketplace
 
+## Video de presentación
+
+🎥 [Ver video del proyecto — Examen Aplicaciones Web](https://ister-my.sharepoint.com/:v:/g/personal/franklin_valladares_ister_edu_ec/IQAp7kMd-4JTRq2t9VzIMd9rAfYoLA-ToqLSDeiryDvkAYQ?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0NvcHkifX0&e=8pT8pB)
+
 ## Capturas de pantalla
 
 ### Página principal y catálogo
